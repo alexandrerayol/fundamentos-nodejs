@@ -1,6 +1,9 @@
 import http from "node:http"
+import { randomUUID } from "node:crypto"
+import { Database } from "./database.js"
 
-const users = []
+const database = new Database()
+
 const server = http.createServer( async (req, res) => {
     const allowedMethods = ["GET", "POST"]
     const { method, url } = req
@@ -25,13 +28,19 @@ const server = http.createServer( async (req, res) => {
         try{    
             body = JSON.parse(buffers.concat().toString())
 
-            const {email, name } = body
+            const {name, email } = body
 
             if(!email || !name){
                 throw Error
             }
 
-            users.push({email, name})
+            const newUser = {
+                id: randomUUID(),
+                name,
+                email
+            }
+
+            database.insert('users', newUser)
         }catch{
             return res
             .writeHead(400, {'Content-Type': 'application/json'})
@@ -40,16 +49,17 @@ const server = http.createServer( async (req, res) => {
             }))
         }
 
-        const {name, email} = body
+        const {name} = body
 
         return res
         .writeHead(201, {'Content-Type': 'application/json'})
         .end(JSON.stringify({
-            message: `${name} and ${email} saved`
+            message: `user ${name} saved`
         }))
     }
 
     if(method === 'GET' && url === '/users'){
+        const users = database.select('users')
         return res
         .writeHead(200, {'Content-Type': 'application/json'})
         .end(JSON.stringify({
