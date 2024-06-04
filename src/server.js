@@ -1,5 +1,4 @@
 import http from "node:http"
-import { json } from "./middlewares/json.js"
 
 const users = []
 const server = http.createServer( async (req, res) => {
