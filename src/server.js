@@ -1,73 +1,29 @@
 import http from "node:http"
-import { randomUUID } from "node:crypto"
-import { Database } from "./database.js"
-
-const database = new Database()
+import { routes } from "./routes.js"
+import { json } from "./middleware/json.js"
 
 const server = http.createServer( async (req, res) => {
-    const allowedMethods = ["GET", "POST"]
+    await json(req,res) //middleware
+
     const { method, url } = req
     
-    if(!allowedMethods.includes(method)){
-        
-        return res
-        .writeHead(405, {'Content-Type': 'application/json'})
-        .end(JSON.stringify({
-            error: "method not allowed"
-        }))
-    }
-    
-    const buffers = []
-    let body = null
+    const route = routes.find(route => {
+        return route.method === method
+         && route.path.test(url) //se a url respeitar o padrão da regex a função retorna true
+    })
 
-    for await (const chunk of req){
-        buffers.push(chunk)
+    if(route){
+        const routeParams = req.url.match(route.path)
+        const params = {...routeParams.groups}
+
+        req.params = params
+
+        return route.handler(req, res)
     }
 
-    if(method === 'POST' && url === '/users' ){
-        try{    
-            body = JSON.parse(buffers.concat().toString())
-
-            const {name, email } = body
-
-            if(!email || !name){
-                throw Error
-            }
-
-            const newUser = {
-                id: randomUUID(),
-                name,
-                email
-            }
-
-            database.insert('users', newUser)
-        }catch{
-            return res
-            .writeHead(400, {'Content-Type': 'application/json'})
-            .end(JSON.stringify({
-                error: "bad request && invalid body"
-            }))
-        }
-
-        const {name} = body
-
-        return res
-        .writeHead(201, {'Content-Type': 'application/json'})
-        .end(JSON.stringify({
-            message: `user ${name} saved`
-        }))
-    }
-
-    if(method === 'GET' && url === '/users'){
-        const users = database.select('users')
-        return res
-        .writeHead(200, {'Content-Type': 'application/json'})
-        .end(JSON.stringify({
-            data: {
-                users
-            }
-        }))
-    }
+    return res.writeHead(404).end(JSON.stringify({
+        error: "not found"
+    }))
 })
 
 server.listen(3333)
